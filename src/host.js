@@ -137,6 +137,36 @@ return {
       return null;
     }
 
+    /** 诊断：loader 服务可用性与 entry 匹配情况 */
+    async function diagnoseLoader(pluginId) {
+      const out = { loaderAvailable: false, entryCount: 0, matchedEntry: null, sampleNames: [] };
+      try {
+        const loader = ctx.get('loader');
+        if (!loader) return out;
+        out.loaderAvailable = true;
+        const entries = loader.entries();
+        out.entryCount = entries ? entries.length : 0;
+        if (entries) {
+          out.sampleNames = entries.slice(0, 12).map(function (e) { return e.options && e.options.name; });
+          for (const entry of entries) {
+            if (entry.options && entry.options.name === pluginId && !entry.options.group) {
+              out.matchedEntry = {
+                id: entry.id,
+                name: entry.options.name,
+                disabled: entry.disabled,
+                hasFiber: !!entry.fiber,
+                group: !!entry.options.group
+              };
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        out.error = (e && e.message) || String(e);
+      }
+      return out;
+    }
+
     /** 当前 Loader 中该插件是否有效启用（fiber 活着） */
     async function pluginActuallyEnabled(pluginId) {
       const entry = await findLoaderEntry(pluginId);
@@ -365,19 +395,26 @@ return {
         }
         // 1. 运行时热启用
         const entry = await findLoaderEntry(pluginId);
+        let updateError = null;
         if (entry) {
           try {
             await entry.update({ disabled: false });
           } catch (e) {
-            console.error('热启用失败: ' + (e && e.message));
+            updateError = (e && e.message) || String(e);
+            console.error('热启用失败: ' + updateError);
           }
+        } else {
+          updateError = 'loader 中未找到该插件的 entry（可能未在配置中）';
         }
         // 2. 持久化到 home patch
         let persisted = false;
         if (bundlePath) persisted = await persistDisabled(bundlePath, pluginId, false);
         return {
-          success: true,
-          message: '插件 ' + pluginId + ' 已启用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+          success: updateError === null,
+          message: updateError === null
+            ? '插件 ' + pluginId + ' 已启用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+            : '启用失败: ' + updateError,
+          diagnostic: { updateError: updateError, persisted: persisted }
         };
       },
 
@@ -388,19 +425,33 @@ return {
         let bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
         // 1. 运行时热停用
         const entry = await findLoaderEntry(pluginId);
+        let updateError = null;
         if (entry) {
           try {
             await entry.update({ disabled: true });
           } catch (e) {
-            console.error('热停用失败: ' + (e && e.message));
+            updateError = (e && e.message) || String(e);
+            console.error('热停用失败: ' + updateError);
           }
+        } else {
+          updateError = 'loader 中未找到该插件的 entry';
         }
         // 2. 持久化到 home patch（clientPath 在热停用后仍可查，此处兜底）
         let persisted = false;
         if (bundlePath) persisted = await persistDisabled(bundlePath, pluginId, true);
+        const loaderDiag = await diagnoseLoader(pluginId);
         return {
-          success: true,
-          message: '插件 ' + pluginId + ' 已停用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+          success: updateError === null,
+          message: updateError === null
+            ? '插件 ' + pluginId + ' 已停用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+            : '停用失败: ' + updateError,
+          diagnostic: {
+            loaderAvailable: loaderDiag.loaderAvailable,
+            entryCount: loaderDiag.entryCount,
+            matchedEntry: loaderDiag.matchedEntry,
+            updateError: updateError,
+            persisted: persisted
+          }
         };
       },
 
@@ -483,6 +534,9 @@ return {
     });
     harness.handle('checkForUpdates', async function (args) {
       return await pluginManager.checkForUpdates(args && args.pluginId);
+    });
+    harness.handle('diagnose', async function (args) {
+      return await diagnoseLoader(args && args.pluginId);
     });
 
     return function () {};

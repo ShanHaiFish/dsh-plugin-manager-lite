@@ -80,6 +80,7 @@ return {
               setState({ plugins: plugins, loading: false, error: null, notice: null, busy: pluginId });
               host.call(method, { pluginId: pluginId }).then(function (result) {
                 var msg = result && result.message ? result.message : '操作完成';
+                var diag = result && result.diagnostic ? JSON.stringify(result.diagnostic) : null;
                 if (result && result.success) {
                   // 操作成功后刷新列表以反映真实状态
                   setState({ plugins: plugins, loading: false, error: null, notice: msg, busy: null });
@@ -89,7 +90,7 @@ return {
                     setState({ plugins: plugins, loading: false, error: null, notice: msg, busy: null });
                   });
                 } else {
-                  setState({ plugins: plugins, loading: false, error: msg, notice: null, busy: null });
+                  setState({ plugins: plugins, loading: false, error: msg + (diag ? ' [诊断: ' + diag + ']' : ''), notice: null, busy: null });
                 }
               }).catch(function (err) {
                 setState({ plugins: plugins, loading: false, error: (err && err.message) || String(err), notice: null, busy: null });
