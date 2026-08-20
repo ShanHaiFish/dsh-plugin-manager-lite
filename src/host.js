@@ -137,7 +137,7 @@ return {
       return null;
     }
 
-    /** 诊断：loader 服务可用性与 entry 匹配情况 */
+    /** 诊断：loader 服务可用性与 entry 匹配情况（返回纯 JSON） */
     async function diagnoseLoader(pluginId) {
       const out = { loaderAvailable: false, entryCount: 0, matchedEntry: null, sampleNames: [] };
       try {
@@ -147,13 +147,14 @@ return {
         const entries = loader.entries();
         out.entryCount = entries ? entries.length : 0;
         if (entries) {
-          out.sampleNames = entries.slice(0, 12).map(function (e) { return e.options && e.options.name; });
+          out.sampleNames = entries.slice(0, 12).map(function (e) { return e && e.options && e.options.name; })
+            .filter(function (n) { return typeof n === 'string' && n.length > 0; });
           for (const entry of entries) {
-            if (entry.options && entry.options.name === pluginId && !entry.options.group) {
+            if (entry && entry.options && entry.options.name === pluginId && !entry.options.group) {
               out.matchedEntry = {
-                id: entry.id,
-                name: entry.options.name,
-                disabled: entry.disabled,
+                id: typeof entry.id === 'string' ? entry.id : String(entry.id),
+                name: String(entry.options.name),
+                disabled: !!entry.disabled,
                 hasFiber: !!entry.fiber,
                 group: !!entry.options.group
               };
