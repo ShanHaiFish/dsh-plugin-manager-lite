@@ -194,7 +194,6 @@ return {
       if (blockStart !== -1) {
         // 修改现有块
         const blockLines = lines.slice(blockStart, blockEnd);
-        const hasDisabled = blockLines.some((l) => /^\s*disabled:/.test(l));
         const cleaned = blockLines.filter((l) => !/^\s*disabled:/.test(l));
         if (disabled) {
           // 保留缩进
@@ -205,9 +204,10 @@ return {
         // 清理连续空行
         return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
       }
-      // 追加新块
+      // 追加新块（仅禁用时需要；启用时无块则无需写入）
+      if (!disabled) return (text || '').trim() + '\n';
       const base = (text || '').trim();
-      const addition = '- id: ' + pluginId + '\n  disabled: ' + (disabled ? 'true' : 'false');
+      const addition = '- id: ' + pluginId + '\n  disabled: true';
       return base ? base + '\n' + addition + '\n' : addition + '\n';
     }
 
@@ -254,32 +254,54 @@ return {
 
     // ---------- 服务主体 ----------
 
+    // 收集一个第三方插件的信息；已停用的插件 graph 中不存在，但 profile 配置仍在
+    async function collectPlugin(clientModules, id, seen) {
+      if (!id || id.startsWith('@deepseek-ai/') || seen.has(id)) return;
+      seen.add(id);
+      const bundlePath = clientModules.clientPath(id) || '';
+      const pkg = bundlePath ? await loadPkgMeta(id, bundlePath) : null;
+      const actualEnabled = await pluginActuallyEnabled(id);
+      return {
+        id,
+        name: (pkg && pkg.name) || id,
+        version: (pkg && pkg.version) || '',
+        description: (pkg && pkg.description) || '',
+        author: authorOf(pkg),
+        homepage: (pkg && pkg.homepage) || '',
+        repository: (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)) || '',
+        enabled: actualEnabled !== false,
+        path: bundlePath,
+        installedLocally: bundlePath.indexOf('plugins-dev') !== -1
+      };
+    }
+
     const pluginManager = {
       // 获取第三方插件列表（排除 @deepseek-ai/ 官方包）
+      // 数据源合并：当前 graph（运行中的）+ profile.bundles（配置中但可能已停用）
       async listThirdPartyPlugins() {
         const clientModules = ctx.get('clientModules');
         if (!clientModules) return [];
         const graph = clientModules.graph();
+        const seen = new Set();
         const plugins = [];
-        // graph.entries 是数组！
+        // 1. 当前运行中的第三方插件（graph）
         for (const entry of (graph.entries || [])) {
-          const id = entry && entry.id;
-          if (!id || id.startsWith('@deepseek-ai/')) continue; // 跳过官方插件
-          const bundlePath = clientModules.clientPath(id) || '';
-          const pkg = bundlePath ? await loadPkgMeta(id, bundlePath) : null;
-          const actualEnabled = await pluginActuallyEnabled(id);
-          plugins.push({
-            id,
-            name: (pkg && pkg.name) || id,
-            version: (pkg && pkg.version) || '',
-            description: (pkg && pkg.description) || '',
-            author: authorOf(pkg),
-            homepage: (pkg && pkg.homepage) || '',
-            repository: (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)) || '',
-            enabled: actualEnabled !== false,
-            path: bundlePath,
-            installedLocally: bundlePath.indexOf('plugins-dev') !== -1
-          });
+          const info = await collectPlugin(clientModules, entry && entry.id, seen);
+          if (info) plugins.push(info);
+        }
+        // 2. profile.bundles 中配置但已停用的第三方插件（停用后 graph 不再包含它）
+        //    用任意 bundle 路径推导 profile 根
+        const anyEntry = (graph.entries || [])[0];
+        const anyPath = anyEntry ? clientModules.clientPath(anyEntry.id) : '';
+        const profilePkgPath = anyPath ? profilePackagePathOf(anyPath) : null;
+        const profile = profilePkgPath ? await readJsonFile(profilePkgPath) : null;
+        const bundles = profile && profile.dsh && profile.dsh.profile && Array.isArray(profile.dsh.profile.bundles)
+          ? profile.dsh.profile.bundles
+          : [];
+        for (const bundleId of bundles) {
+          if (bundleId && bundleId.startsWith('@deepseek-ai/')) continue; // 跳过官方 bundle
+          const info = await collectPlugin(clientModules, bundleId, seen);
+          if (info) plugins.push(info);
         }
         return plugins;
       },
