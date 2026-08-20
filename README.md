@@ -1,0 +1,37 @@
+# DSH 第三方插件管理器 (third-party-plugin-manager)
+
+管理 DeepSeek Harness Web 中除了官方插件（`@deepseek-ai/*`）之外的第三方插件。
+
+## 功能
+
+- **列出第三方插件**：只显示非官方插件（当前环境 6 个），读取 package.json 展示真实名称、版本、作者、描述，并标注「本地安装 / npm」
+- **启用 / 停用**：切换插件运行状态
+- **检查更新**：查询 npm registry，对比当前版本与最新版本
+- **卸载**：移除插件（规划中）
+
+## 安装位置
+
+插件以动态 Cordis 插件形式运行在 DSH 进程中（pluginId: `tpm-3`）。
+源码托管于本仓库，通过 cordis_define 部署到运行时。
+
+## 目录结构
+
+```
+src/
+  host.js     Host 半源码（服务 + RPC 方法）
+  client.js   Client 半源码（设置页「插件 → 第三方插件」选项卡 UI）
+```
+
+## 开发流程
+
+1. 修改 `src/host.js` / `src/client.js`
+2. 通过 cordis_define 定义新 Package（kind: existing, pluginId: tpm-3）
+3. cordis_run update 激活
+
+## 里程碑
+
+- [x] v1 基础框架：服务 + 设置页选项卡
+- [x] v2 修复列表：正确遍历 graph.entries（数组），只显示第三方插件
+- [x] v2 显示真实名称：读取 package.json 元信息
+- [x] v3 修复检查更新：WebFetchResult.body 为 { kind, content } 结构
+- [ ] v4 真正的启用/停用/卸载（修改 profile 配置 + 重启生效）
