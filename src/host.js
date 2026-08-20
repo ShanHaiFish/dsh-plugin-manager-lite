@@ -14,18 +14,25 @@ return {
   apply(ctx) {
     // ---------- 路径推导 ----------
 
+    /** 路径统一为正斜杠（clientPath 在 Windows 返回反斜杠路径） */
+    function normPath(p) {
+      return (p || '').replace(/\\/g, '/');
+    }
+
     /** 从 bundle 路径推导 DSH home 目录（C:/Users/x/.dsh） */
     function dshHomeOf(bundlePath) {
-      const idx = bundlePath.indexOf('/.dsh/');
+      const p = normPath(bundlePath);
+      const idx = p.indexOf('/.dsh/');
       if (idx === -1) return null;
-      return bundlePath.slice(0, idx + 5); // 含 /.dsh
+      return p.slice(0, idx + 5); // 含 /.dsh
     }
 
     /** 从 bundle 路径推导 profile 根目录（.../profiles/web） */
     function profileRootOf(bundlePath) {
-      const idx = bundlePath.indexOf('/node_modules/');
+      const p = normPath(bundlePath);
+      const idx = p.indexOf('/node_modules/');
       if (idx === -1) return null;
-      return bundlePath.slice(0, idx);
+      return p.slice(0, idx);
     }
 
     /** 从 bundle 路径推导 profile 的 package.json 绝对路径 */
@@ -254,13 +261,35 @@ return {
 
     // ---------- 服务主体 ----------
 
+    // 直接从包目录读取 package.json（用于已停用插件，其 bundle 已从 clientModules 表移除）
+    async function loadPkgFromDir(id, pkgDir) {
+      const fs = ctx.get('fs');
+      if (!fs || !pkgDir) return null;
+      try {
+        const target = await fs.resolve(normPath(pkgDir) + '/package.json');
+        const text = await fs.readText(target);
+        const pkg = JSON.parse(text);
+        if (pkg && pkg.name === id) return pkg;
+      } catch (e) { /* 读取失败 */ }
+      return null;
+    }
+
     // 收集一个第三方插件的信息；已停用的插件 graph 中不存在，但 profile 配置仍在
-    async function collectPlugin(clientModules, id, seen) {
+    async function collectPlugin(clientModules, id, seen, profileRoot) {
       if (!id || id.startsWith('@deepseek-ai/') || seen.has(id)) return;
       seen.add(id);
-      const bundlePath = clientModules.clientPath(id) || '';
-      const pkg = bundlePath ? await loadPkgMeta(id, bundlePath) : null;
+      let bundlePath = clientModules.clientPath(id) || '';
+      let pkg = bundlePath ? await loadPkgMeta(id, bundlePath) : null;
+      // 已停用插件拿不到 clientPath：从 profile 的 node_modules 直接读
+      let fallbackDir = '';
+      if (!pkg && profileRoot) {
+        fallbackDir = id.indexOf('@') === 0
+          ? profileRoot + '/node_modules/' + id.replace('/', '/')
+          : profileRoot + '/node_modules/' + id;
+        pkg = await loadPkgFromDir(id, fallbackDir);
+      }
       const actualEnabled = await pluginActuallyEnabled(id);
+      const displayPath = bundlePath || (fallbackDir ? fallbackDir + '/client.js' : '');
       return {
         id,
         name: (pkg && pkg.name) || id,
@@ -270,8 +299,8 @@ return {
         homepage: (pkg && pkg.homepage) || '',
         repository: (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)) || '',
         enabled: actualEnabled !== false,
-        path: bundlePath,
-        installedLocally: bundlePath.indexOf('plugins-dev') !== -1
+        path: displayPath,
+        installedLocally: displayPath.indexOf('plugins-dev') !== -1
       };
     }
 
@@ -284,23 +313,24 @@ return {
         const graph = clientModules.graph();
         const seen = new Set();
         const plugins = [];
-        // 1. 当前运行中的第三方插件（graph）
-        for (const entry of (graph.entries || [])) {
-          const info = await collectPlugin(clientModules, entry && entry.id, seen);
-          if (info) plugins.push(info);
-        }
-        // 2. profile.bundles 中配置但已停用的第三方插件（停用后 graph 不再包含它）
-        //    用任意 bundle 路径推导 profile 根
+        // 用任意 bundle 路径推导 profile 根（先于遍历，供已停用插件兜底）
         const anyEntry = (graph.entries || [])[0];
         const anyPath = anyEntry ? clientModules.clientPath(anyEntry.id) : '';
         const profilePkgPath = anyPath ? profilePackagePathOf(anyPath) : null;
+        const profileRoot = profilePkgPath ? profileRootOf(anyPath) : null;
         const profile = profilePkgPath ? await readJsonFile(profilePkgPath) : null;
         const bundles = profile && profile.dsh && profile.dsh.profile && Array.isArray(profile.dsh.profile.bundles)
           ? profile.dsh.profile.bundles
           : [];
+        // 1. 当前运行中的第三方插件（graph）
+        for (const entry of (graph.entries || [])) {
+          const info = await collectPlugin(clientModules, entry && entry.id, seen, profileRoot);
+          if (info) plugins.push(info);
+        }
+        // 2. profile.bundles 中配置但已停用的第三方插件（停用后 graph 不再包含它）
         for (const bundleId of bundles) {
           if (bundleId && bundleId.startsWith('@deepseek-ai/')) continue; // 跳过官方 bundle
-          const info = await collectPlugin(clientModules, bundleId, seen);
+          const info = await collectPlugin(clientModules, bundleId, seen, profileRoot);
           if (info) plugins.push(info);
         }
         return plugins;
@@ -320,7 +350,19 @@ return {
       async enablePlugin(pluginId) {
         console.log('启用插件: ' + pluginId);
         const clientModules = ctx.get('clientModules');
-        const bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        let bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        // 已停用插件拿不到 clientPath：从任意可见 bundle 推导 home
+        if (!bundlePath && clientModules) {
+          const graph = clientModules.graph();
+          const anyEntry = (graph.entries || [])[0];
+          const anyPath = anyEntry ? clientModules.clientPath(anyEntry.id) : '';
+          if (anyPath) {
+            const root = profileRootOf(anyPath);
+            bundlePath = normPath(pluginId.indexOf('@') === 0
+              ? root + '/node_modules/' + pluginId.replace('/', '/') + '/client.js'
+              : root + '/node_modules/' + pluginId + '/client.js');
+          }
+        }
         // 1. 运行时热启用
         const entry = await findLoaderEntry(pluginId);
         if (entry) {
@@ -343,7 +385,7 @@ return {
       async disablePlugin(pluginId) {
         console.log('停用插件: ' + pluginId);
         const clientModules = ctx.get('clientModules');
-        const bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        let bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
         // 1. 运行时热停用
         const entry = await findLoaderEntry(pluginId);
         if (entry) {
@@ -353,7 +395,7 @@ return {
             console.error('热停用失败: ' + (e && e.message));
           }
         }
-        // 2. 持久化到 home patch
+        // 2. 持久化到 home patch（clientPath 在热停用后仍可查，此处兜底）
         let persisted = false;
         if (bundlePath) persisted = await persistDisabled(bundlePath, pluginId, true);
         return {
