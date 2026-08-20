@@ -34,4 +34,12 @@ src/
 - [x] v2 修复列表：正确遍历 graph.entries（数组），只显示第三方插件
 - [x] v2 显示真实名称：读取 package.json 元信息
 - [x] v3 修复检查更新：WebFetchResult.body 为 { kind, content } 结构
-- [ ] v4 真正的启用/停用/卸载（修改 profile 配置 + 重启生效）
+- [x] v4 真正的启用/停用/卸载：
+  - loader entry.update({ disabled }) 运行时热切换（立即生效）
+  - 持久化到 `~/.dsh/cordis.patch.yml`（重启后保持）
+  - 卸载时从 profile package.json 移除 dependencies + bundles
+  - 列表显示真实运行状态（fiber 存活判断）
+- [x] v4.1 修复停用后插件从列表消失：
+  - 列表数据源合并 graph（运行中）+ profile.bundles（配置中已停用）
+  - 停用的插件仍显示并可重新启用
+- [ ] v5 更新插件本体：下载新版本并替换（需 npm 安装能力）
