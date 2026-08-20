@@ -134,7 +134,7 @@ return {
                               plugin.installedLocally ? '本地安装' : 'npm'
                             ),
                             React.createElement('span', { className: plugin.enabled ? 'plugin-status on' : 'plugin-status off' },
-                              plugin.enabled ? '运行中' : '已停用'
+                              plugin.enabled ? '运行中' : (plugin.persistedDisabled ? '已停用(重启生效)' : '已停用')
                             )
                           ),
                           React.createElement('p', { className: 'plugin-id' }, plugin.id),
@@ -142,7 +142,7 @@ return {
                           React.createElement('div', { className: 'plugin-meta' },
                             plugin.version && React.createElement('span', null, 'v' + plugin.version),
                             plugin.author && React.createElement('span', null, plugin.author),
-                            plugin.enabled ? React.createElement('span', null, '生效中') : React.createElement('span', null, '重启后保持停用')
+                            plugin.enabled ? React.createElement('span', null, '生效中') : React.createElement('span', null, plugin.persistedDisabled ? '已持久化停用，重启后不再加载' : '未运行')
                           )
                         ),
                         React.createElement('div', { className: 'plugin-actions' },

@@ -304,6 +304,26 @@ return {
       return null;
     }
 
+    // 读取 home patch 中某个插件的 disabled 标记（持久化状态）
+    async function patchedDisabledOf(bundlePath, pluginId) {
+      const home = dshHomeOf(bundlePath);
+      if (!home) return false;
+      const text = await readTextFile(home + '/cordis.patch.yml');
+      if (!text) return false;
+      const lines = text.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\s*-\s+id:/.test(lines[i]) && lines[i].includes(pluginId)) {
+          // 检查该块的 disabled 行
+          let j = i + 1;
+          while (j < lines.length && !/^\s*-\s+id:/.test(lines[j]) && lines[j].trim() !== '') {
+            if (/^\s*disabled:\s*true\s*$/.test(lines[j])) return true;
+            j++;
+          }
+        }
+      }
+      return false;
+    }
+
     // 收集一个第三方插件的信息；已停用的插件 graph 中不存在，但 profile 配置仍在
     async function collectPlugin(clientModules, id, seen, profileRoot) {
       if (!id || id.startsWith('@deepseek-ai/') || seen.has(id)) return;
@@ -319,6 +339,9 @@ return {
         pkg = await loadPkgFromDir(id, fallbackDir);
       }
       const actualEnabled = await pluginActuallyEnabled(id);
+      const patchedDisabled = bundlePath ? await patchedDisabledOf(bundlePath, id) : false;
+      // enabled = loader 实际运行 且 未被持久化停用
+      const enabled = actualEnabled !== false && !patchedDisabled;
       const displayPath = bundlePath || (fallbackDir ? fallbackDir + '/client.js' : '');
       return {
         id,
@@ -328,7 +351,8 @@ return {
         author: authorOf(pkg),
         homepage: (pkg && pkg.homepage) || '',
         repository: (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)) || '',
-        enabled: actualEnabled !== false,
+        enabled: enabled,
+        persistedDisabled: patchedDisabled,
         path: displayPath,
         installedLocally: displayPath.indexOf('plugins-dev') !== -1
       };
