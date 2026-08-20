@@ -3,7 +3,8 @@
  *
  * 管理 DSH Web 中除了官方插件（@deepseek-ai/*）之外的第三方插件：
  *   - 列出第三方插件（读取 graph + package.json 元信息）
- *   - 启用 / 停用 / 卸载
+ *   - 启用 / 停用（运行时热切换 + 持久化到 home patch）
+ *   - 卸载（运行时停用 + 从 profile 配置移除）
  *   - 检查 npm 更新
  *
  * 本文件是 cordis_define 时传给 code.host 的函数体（return { apply(ctx) {...} }）。
@@ -11,7 +12,81 @@
 
 return {
   apply(ctx) {
-    // 从 bundle 路径向上查找包根目录的 package.json
+    // ---------- 路径推导 ----------
+
+    /** 从 bundle 路径推导 DSH home 目录（C:/Users/x/.dsh） */
+    function dshHomeOf(bundlePath) {
+      const idx = bundlePath.indexOf('/.dsh/');
+      if (idx === -1) return null;
+      return bundlePath.slice(0, idx + 5); // 含 /.dsh
+    }
+
+    /** 从 bundle 路径推导 profile 根目录（.../profiles/web） */
+    function profileRootOf(bundlePath) {
+      const idx = bundlePath.indexOf('/node_modules/');
+      if (idx === -1) return null;
+      return bundlePath.slice(0, idx);
+    }
+
+    /** 从 bundle 路径推导 profile 的 package.json 绝对路径 */
+    function profilePackagePathOf(bundlePath) {
+      const root = profileRootOf(bundlePath);
+      return root ? root + '/package.json' : null;
+    }
+
+    // ---------- 文件工具（fs 服务） ----------
+
+    async function readJsonFile(absPath) {
+      const fs = ctx.get('fs');
+      if (!fs || !absPath) return null;
+      try {
+        const target = await fs.resolve(absPath);
+        const text = await fs.readText(target);
+        return JSON.parse(text);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writeJsonFile(absPath, value) {
+      const fs = ctx.get('fs');
+      if (!fs || !absPath) return false;
+      try {
+        const target = await fs.resolve(absPath);
+        await fs.writeText(target, JSON.stringify(value, null, 2) + '\n');
+        return true;
+      } catch (e) {
+        console.error('写入失败: ' + absPath + ' -> ' + (e && e.message));
+        return false;
+      }
+    }
+
+    async function readTextFile(absPath) {
+      const fs = ctx.get('fs');
+      if (!fs || !absPath) return null;
+      try {
+        const target = await fs.resolve(absPath);
+        return await fs.readText(target);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writeTextFile(absPath, content) {
+      const fs = ctx.get('fs');
+      if (!fs || !absPath) return false;
+      try {
+        const target = await fs.resolve(absPath);
+        await fs.writeText(target, content);
+        return true;
+      } catch (e) {
+        console.error('写入失败: ' + absPath + ' -> ' + (e && e.message));
+        return false;
+      }
+    }
+
+    // ---------- 从 bundle 路径向上查找包根目录的 package.json ----------
+
     async function loadPkgMeta(id, bundlePath) {
       const fs = ctx.get('fs');
       if (!fs || !bundlePath) return null;
@@ -33,13 +108,151 @@ return {
       return null;
     }
 
-    // 解析 author 字段（字符串或对象）
+    /** 解析 author 字段（字符串或对象） */
     function authorOf(pkg) {
       if (!pkg || !pkg.author) return '';
       if (typeof pkg.author === 'string') return pkg.author;
       if (typeof pkg.author === 'object' && pkg.author && pkg.author.name) return pkg.author.name;
       return '';
     }
+
+    // ---------- Loader 运行时热切换 ----------
+
+    /** 在 Loader 树中查找某个包的 entry（非 group） */
+    async function findLoaderEntry(pluginId) {
+      const loader = ctx.get('loader');
+      if (!loader) return null;
+      for (const entry of loader.entries()) {
+        if (entry.options && entry.options.name === pluginId && !entry.options.group) {
+          return entry;
+        }
+      }
+      return null;
+    }
+
+    /** 当前 Loader 中该插件是否有效启用（fiber 活着） */
+    async function pluginActuallyEnabled(pluginId) {
+      const entry = await findLoaderEntry(pluginId);
+      if (!entry) return null;
+      return !entry.disabled && !!entry.fiber;
+    }
+
+    // ---------- home patch 持久化（$DSH_HOME/cordis.patch.yml） ----------
+
+    /**
+     * 读取 home patch 文件内容（顶层 YAML 数组）。
+     * 由于动态环境无 YAML 库，采用轻量行级维护：
+     *   - 读原文
+     *   - 查找 `- id: <pluginId>` 条目块
+     *   - 修改该块内的 `disabled: ...` 行，或整块追加
+     */
+    async function homePatchText(bundlePath) {
+      const home = dshHomeOf(bundlePath);
+      if (!home) return null;
+      const path = home + '/cordis.patch.yml';
+      const existing = await readTextFile(path);
+      return { path, text: existing };
+    }
+
+    /** 解析 YAML patch 条目块：按顶层 `- id:` 分隔（简易实现，适用于 dsh 生成的 patch 文件） */
+    function splitPatchEntries(text) {
+      const entries = [];
+      if (!text || !text.trim()) return entries;
+      const lines = text.split(/\r?\n/);
+      let current = null;
+      for (const line of lines) {
+        if (/^\s*-\s+id:/.test(line)) {
+          if (current) entries.push(current);
+          current = { header: line, body: [] };
+        } else if (current) {
+          current.body.push(line);
+        } else if (line.trim() !== '' && !line.trim().startsWith('#')) {
+          // 前置内容（注释等）忽略
+        }
+      }
+      if (current) entries.push(current);
+      return entries;
+    }
+
+    /** 在 patch 文本中设置某个插件的 disabled 状态；返回新文本 */
+    function setPatchDisabled(text, pluginId, disabled) {
+      const lines = (text || '').split(/\r?\n/);
+      const out = [];
+      let blockStart = -1;
+      let blockEnd = -1;
+      // 找目标块
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\s*-\s+id:/.test(lines[i]) && lines[i].includes(pluginId)) {
+          blockStart = i;
+          blockEnd = i + 1;
+          while (blockEnd < lines.length && !/^\s*-\s+id:/.test(lines[blockEnd]) && lines[blockEnd].trim() !== '') {
+            blockEnd++;
+          }
+          break;
+        }
+      }
+      if (blockStart !== -1) {
+        // 修改现有块
+        const blockLines = lines.slice(blockStart, blockEnd);
+        const hasDisabled = blockLines.some((l) => /^\s*disabled:/.test(l));
+        const cleaned = blockLines.filter((l) => !/^\s*disabled:/.test(l));
+        if (disabled) {
+          // 保留缩进
+          const indent = (blockLines[0].match(/^\s*/) || [''])[0];
+          cleaned.push(indent + '  disabled: true');
+        }
+        out.push(...lines.slice(0, blockStart), ...cleaned, ...lines.slice(blockEnd));
+        // 清理连续空行
+        return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+      }
+      // 追加新块
+      const base = (text || '').trim();
+      const addition = '- id: ' + pluginId + '\n  disabled: ' + (disabled ? 'true' : 'false');
+      return base ? base + '\n' + addition + '\n' : addition + '\n';
+    }
+
+    /** 持久化 disabled 状态到 home patch */
+    async function persistDisabled(bundlePath, pluginId, disabled) {
+      const home = dshHomeOf(bundlePath);
+      if (!home) return false;
+      const path = home + '/cordis.patch.yml';
+      const existing = await readTextFile(path);
+      const next = setPatchDisabled(existing || '', pluginId, disabled);
+      return await writeTextFile(path, next);
+    }
+
+    // ---------- profile package.json 维护（卸载） ----------
+
+    /** 从 profile package.json 移除一个插件（dependencies + bundles） */
+    async function removeFromProfile(bundlePath, pluginId) {
+      const pkgPath = profilePackagePathOf(bundlePath);
+      if (!pkgPath) return { ok: false, message: '无法定位 profile 配置' };
+      const profile = await readJsonFile(pkgPath);
+      if (!profile) return { ok: false, message: '无法读取 profile 配置' };
+      let changed = false;
+      // dependencies
+      if (profile.dependencies && profile.dependencies[pluginId] !== undefined) {
+        delete profile.dependencies[pluginId];
+        changed = true;
+      }
+      // devDependencies
+      if (profile.devDependencies && profile.devDependencies[pluginId] !== undefined) {
+        delete profile.devDependencies[pluginId];
+        changed = true;
+      }
+      // bundles
+      if (profile.dsh && profile.dsh.profile && Array.isArray(profile.dsh.profile.bundles)) {
+        const before = profile.dsh.profile.bundles.length;
+        profile.dsh.profile.bundles = profile.dsh.profile.bundles.filter((b) => b !== pluginId);
+        if (profile.dsh.profile.bundles.length !== before) changed = true;
+      }
+      if (!changed) return { ok: false, message: '该插件不在 profile 配置中（可能由其他方式安装）' };
+      const wrote = await writeJsonFile(pkgPath, profile);
+      if (!wrote) return { ok: false, message: '写入 profile 配置失败' };
+      return { ok: true, message: '已从 profile 配置移除（重启后生效）' };
+    }
+
+    // ---------- 服务主体 ----------
 
     const pluginManager = {
       // 获取第三方插件列表（排除 @deepseek-ai/ 官方包）
@@ -54,6 +267,7 @@ return {
           if (!id || id.startsWith('@deepseek-ai/')) continue; // 跳过官方插件
           const bundlePath = clientModules.clientPath(id) || '';
           const pkg = bundlePath ? await loadPkgMeta(id, bundlePath) : null;
+          const actualEnabled = await pluginActuallyEnabled(id);
           plugins.push({
             id,
             name: (pkg && pkg.name) || id,
@@ -62,7 +276,7 @@ return {
             author: authorOf(pkg),
             homepage: (pkg && pkg.homepage) || '',
             repository: (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)) || '',
-            enabled: true,
+            enabled: actualEnabled !== false,
             path: bundlePath,
             installedLocally: bundlePath.indexOf('plugins-dev') !== -1
           });
@@ -80,19 +294,72 @@ return {
         });
       },
 
+      // 启用插件（运行时热启用 + 持久化）
       async enablePlugin(pluginId) {
         console.log('启用插件: ' + pluginId);
-        return { success: true, message: '插件 ' + pluginId + ' 已启用' };
+        const clientModules = ctx.get('clientModules');
+        const bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        // 1. 运行时热启用
+        const entry = await findLoaderEntry(pluginId);
+        if (entry) {
+          try {
+            await entry.update({ disabled: false });
+          } catch (e) {
+            console.error('热启用失败: ' + (e && e.message));
+          }
+        }
+        // 2. 持久化到 home patch
+        let persisted = false;
+        if (bundlePath) persisted = await persistDisabled(bundlePath, pluginId, false);
+        return {
+          success: true,
+          message: '插件 ' + pluginId + ' 已启用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+        };
       },
 
+      // 停用插件（运行时热停用 + 持久化）
       async disablePlugin(pluginId) {
         console.log('停用插件: ' + pluginId);
-        return { success: true, message: '插件 ' + pluginId + ' 已停用' };
+        const clientModules = ctx.get('clientModules');
+        const bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        // 1. 运行时热停用
+        const entry = await findLoaderEntry(pluginId);
+        if (entry) {
+          try {
+            await entry.update({ disabled: true });
+          } catch (e) {
+            console.error('热停用失败: ' + (e && e.message));
+          }
+        }
+        // 2. 持久化到 home patch
+        let persisted = false;
+        if (bundlePath) persisted = await persistDisabled(bundlePath, pluginId, true);
+        return {
+          success: true,
+          message: '插件 ' + pluginId + ' 已停用' + (persisted ? '（已持久化，重启后保持）' : '（运行时生效，未持久化）')
+        };
       },
 
+      // 卸载插件（运行时停用 + 从 profile 配置移除 + 持久化 disabled）
       async uninstallPlugin(pluginId) {
         console.log('卸载插件: ' + pluginId);
-        return { success: false, message: '卸载功能需要重启后生效，暂未实现实际删除' };
+        const clientModules = ctx.get('clientModules');
+        const bundlePath = clientModules ? (clientModules.clientPath(pluginId) || '') : '';
+        // 1. 运行时停用
+        const entry = await findLoaderEntry(pluginId);
+        if (entry) {
+          try {
+            await entry.update({ disabled: true });
+          } catch (e) { /* 忽略 */ }
+        }
+        // 2. 持久化 disabled
+        if (bundlePath) await persistDisabled(bundlePath, pluginId, true);
+        // 3. 从 profile 配置移除依赖与 bundles
+        const removed = bundlePath ? await removeFromProfile(bundlePath, pluginId) : { ok: false, message: '无法定位安装路径' };
+        return {
+          success: removed.ok,
+          message: '插件 ' + pluginId + ' 已卸载：' + removed.message + '。请重启 DSH 完成清理。'
+        };
       },
 
       // 检查更新：查询 npm registry

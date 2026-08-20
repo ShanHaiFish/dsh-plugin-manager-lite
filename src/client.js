@@ -22,12 +22,16 @@ return {
       .plugin-header .refresh-btn:hover { background: #2563eb; }
       .plugin-header .refresh-btn:disabled { background: #9ca3af; cursor: not-allowed; }
       .plugin-list { display: flex; flex-direction: column; gap: 8px; }
-      .plugin-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; background: white; }
+      .plugin-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; background: white; transition: opacity 0.2s; }
       .plugin-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+      .plugin-item.disabled { opacity: 0.6; background: #f9fafb; }
       .plugin-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
       .plugin-name { font-size: 14px; font-weight: 600; color: #111827; margin: 0; display: flex; align-items: center; gap: 8px; }
       .plugin-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #ecfdf5; color: #059669; font-weight: 500; }
       .plugin-badge.local { background: #eff6ff; color: #2563eb; }
+      .plugin-status { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+      .plugin-status.on { background: #ecfdf5; color: #059669; }
+      .plugin-status.off { background: #fef3c7; color: #b45309; }
       .plugin-id { font-size: 11px; color: #9ca3af; margin: 2px 0 0 0; font-family: monospace; }
       .plugin-desc { font-size: 12px; color: #6b7280; margin: 6px 0 0 0; line-height: 1.5; }
       .plugin-meta { display: flex; gap: 12px; font-size: 11px; color: #9ca3af; margin-top: 8px; flex-wrap: wrap; }
@@ -45,6 +49,7 @@ return {
       .empty-state { text-align: center; padding: 32px; color: #9ca3af; }
       .error { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
       .notice { color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+      .busy { opacity: 0.5; pointer-events: none; }
     `;
     document.head.appendChild(style);
 
@@ -53,42 +58,50 @@ return {
         { name: 'settings.plugins.tab', id: 'third-party', order: 20, label: '第三方插件' },
         function (props) {
           function PluginManager() {
-            var state = React.useState({ plugins: [], loading: false, error: null, notice: null });
+            var state = React.useState({ plugins: [], loading: false, error: null, notice: null, busy: null });
             var plugins = state[0].plugins;
             var loading = state[0].loading;
             var error = state[0].error;
             var notice = state[0].notice;
+            var busy = state[0].busy;
             var setState = state[1];
 
             var fetchPlugins = React.useCallback(function () {
-              setState({ plugins: plugins, loading: true, error: null, notice: null });
+              setState({ plugins: plugins, loading: true, error: null, notice: null, busy: null });
               host.call('listThirdPartyPlugins').then(function (result) {
-                setState({ plugins: result || [], loading: false, error: null, notice: null });
+                setState({ plugins: result || [], loading: false, error: null, notice: null, busy: null });
               }).catch(function (err) {
-                setState({ plugins: [], loading: false, error: (err && err.message) || String(err), notice: null });
+                setState({ plugins: [], loading: false, error: (err && err.message) || String(err), notice: null, busy: null });
               });
             }, [plugins]);
 
             var runAction = React.useCallback(function (method, pluginId, confirmMsg) {
               if (confirmMsg && !confirm(confirmMsg)) return;
+              setState({ plugins: plugins, loading: false, error: null, notice: null, busy: pluginId });
               host.call(method, { pluginId: pluginId }).then(function (result) {
                 var msg = result && result.message ? result.message : '操作完成';
                 if (result && result.success) {
-                  setState({ plugins: plugins, loading: false, error: null, notice: msg });
+                  // 操作成功后刷新列表以反映真实状态
+                  setState({ plugins: plugins, loading: false, error: null, notice: msg, busy: null });
+                  host.call('listThirdPartyPlugins').then(function (fresh) {
+                    setState({ plugins: fresh || [], loading: false, error: null, notice: msg, busy: null });
+                  }).catch(function () {
+                    setState({ plugins: plugins, loading: false, error: null, notice: msg, busy: null });
+                  });
                 } else {
-                  setState({ plugins: plugins, loading: false, error: msg, notice: null });
+                  setState({ plugins: plugins, loading: false, error: msg, notice: null, busy: null });
                 }
               }).catch(function (err) {
-                setState({ plugins: plugins, loading: false, error: (err && err.message) || String(err), notice: null });
+                setState({ plugins: plugins, loading: false, error: (err && err.message) || String(err), notice: null, busy: null });
               });
             }, [plugins]);
 
             React.useEffect(function () {
-              setState({ plugins: [], loading: true, error: null, notice: null });
+              setState({ plugins: [], loading: true, error: null, notice: null, busy: null });
               host.call('listThirdPartyPlugins').then(function (result) {
-                setState({ plugins: result || [], loading: false, error: null, notice: null });
+                setState({ plugins: result || [], loading: false, error: null, notice: null, busy: null });
               }).catch(function (err) {
-                setState({ plugins: [], loading: false, error: (err && err.message) || String(err), notice: null });
+                setState({ plugins: [], loading: false, error: (err && err.message) || String(err), notice: null, busy: null });
               });
             }, []);
 
@@ -98,7 +111,7 @@ return {
                   React.createElement('h3', null, '第三方插件'),
                   React.createElement('span', { className: 'plugin-count' }, '共 ' + plugins.length + ' 个')
                 ),
-                React.createElement('button', { className: 'refresh-btn', onClick: fetchPlugins, disabled: loading },
+                React.createElement('button', { className: 'refresh-btn', onClick: fetchPlugins, disabled: loading || busy },
                   loading ? '加载中...' : '刷新'
                 )
               ),
@@ -107,13 +120,16 @@ return {
               plugins.length === 0
                 ? React.createElement('div', { className: 'empty-state' }, React.createElement('p', null, loading ? '正在加载...' : '暂无第三方插件'))
                 : React.createElement('div', { className: 'plugin-list' }, plugins.map(function (plugin) {
-                    return React.createElement('div', { key: plugin.id, className: 'plugin-item' },
+                    return React.createElement('div', { key: plugin.id, className: 'plugin-item' + (plugin.enabled ? '' : ' disabled') + (busy === plugin.id ? ' busy' : '') },
                       React.createElement('div', { className: 'plugin-top' },
                         React.createElement('div', null,
                           React.createElement('p', { className: 'plugin-name' },
                             plugin.name,
                             React.createElement('span', { className: plugin.installedLocally ? 'plugin-badge local' : 'plugin-badge' },
                               plugin.installedLocally ? '本地安装' : 'npm'
+                            ),
+                            React.createElement('span', { className: plugin.enabled ? 'plugin-status on' : 'plugin-status off' },
+                              plugin.enabled ? '运行中' : '已停用'
                             )
                           ),
                           React.createElement('p', { className: 'plugin-id' }, plugin.id),
@@ -121,13 +137,15 @@ return {
                           React.createElement('div', { className: 'plugin-meta' },
                             plugin.version && React.createElement('span', null, 'v' + plugin.version),
                             plugin.author && React.createElement('span', null, plugin.author),
-                            React.createElement('span', null, '已启用')
+                            plugin.enabled ? React.createElement('span', null, '生效中') : React.createElement('span', null, '重启后保持停用')
                           )
                         ),
                         React.createElement('div', { className: 'plugin-actions' },
-                          React.createElement('button', { className: 'disable', onClick: function () { runAction('disablePlugin', plugin.id); } }, '停用'),
-                          React.createElement('button', { className: 'update', onClick: function () { runAction('checkForUpdates', plugin.id); } }, '检查更新'),
-                          React.createElement('button', { className: 'uninstall', onClick: function () { runAction('uninstallPlugin', plugin.id, '确定要卸载插件 ' + plugin.id + ' 吗？'); } }, '卸载')
+                          plugin.enabled
+                            ? React.createElement('button', { className: 'disable', onClick: function () { runAction('disablePlugin', plugin.id); }, disabled: busy !== null }, '停用')
+                            : React.createElement('button', { className: 'enable', onClick: function () { runAction('enablePlugin', plugin.id); }, disabled: busy !== null }, '启用'),
+                          React.createElement('button', { className: 'update', onClick: function () { runAction('checkForUpdates', plugin.id); }, disabled: busy !== null }, '检查更新'),
+                          React.createElement('button', { className: 'uninstall', onClick: function () { runAction('uninstallPlugin', plugin.id, '确定要卸载插件 ' + plugin.id + ' 吗？将同时从 profile 配置中移除。'); }, disabled: busy !== null }, '卸载')
                         )
                       )
                     );
