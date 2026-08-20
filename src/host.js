@@ -426,9 +426,19 @@ return {
         // 1. 运行时热停用
         const entry = await findLoaderEntry(pluginId);
         let updateError = null;
+        let afterDisabled = null;
+        let afterHasFiber = null;
         if (entry) {
           try {
+            console.log('找到 entry: name=' + entry.options.name + ' disabled=' + entry.disabled + ' hasFiber=' + !!entry.fiber);
             await entry.update({ disabled: true });
+            // update 后立即复查状态
+            afterDisabled = !!entry.disabled;
+            afterHasFiber = !!entry.fiber;
+            console.log('update 后: disabled=' + afterDisabled + ' hasFiber=' + afterHasFiber);
+            if (!afterDisabled) {
+              updateError = 'update 调用完成但 entry.disabled 仍为 false（热切换未生效）';
+            }
           } catch (e) {
             updateError = (e && e.message) || String(e);
             console.error('热停用失败: ' + updateError);
@@ -450,6 +460,8 @@ return {
             entryCount: loaderDiag.entryCount,
             matchedEntry: loaderDiag.matchedEntry,
             updateError: updateError,
+            afterDisabled: afterDisabled,
+            afterHasFiber: afterHasFiber,
             persisted: persisted
           }
         };

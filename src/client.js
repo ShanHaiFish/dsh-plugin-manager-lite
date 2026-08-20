@@ -81,6 +81,8 @@ return {
               host.call(method, { pluginId: pluginId }).then(function (result) {
                 var msg = result && result.message ? result.message : '操作完成';
                 var diag = result && result.diagnostic ? JSON.stringify(result.diagnostic) : null;
+                // 用 alert 弹窗确保用户看到结果（停用/启用/卸载/检查更新）
+                try { alert((result && result.success ? '✅ ' : '❌ ') + msg + (diag ? '\n\n诊断: ' + diag : '')); } catch (e) { /* 弹窗失败忽略 */ }
                 if (result && result.success) {
                   // 操作成功后刷新列表以反映真实状态
                   setState({ plugins: plugins, loading: false, error: null, notice: msg, busy: null });
@@ -93,7 +95,9 @@ return {
                   setState({ plugins: plugins, loading: false, error: msg + (diag ? ' [诊断: ' + diag + ']' : ''), notice: null, busy: null });
                 }
               }).catch(function (err) {
-                setState({ plugins: plugins, loading: false, error: (err && err.message) || String(err), notice: null, busy: null });
+                var emsg = (err && err.message) || String(err);
+                try { alert('❌ 调用失败: ' + emsg); } catch (e2) { /* 忽略 */ }
+                setState({ plugins: plugins, loading: false, error: emsg, notice: null, busy: null });
               });
             }, [plugins]);
 
