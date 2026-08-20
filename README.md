@@ -42,4 +42,8 @@ src/
 - [x] v4.1 修复停用后插件从列表消失：
   - 列表数据源合并 graph（运行中）+ profile.bundles（配置中已停用）
   - 停用的插件仍显示并可重新启用
+- [x] v4.2 修复 Windows 路径 bug（停用后插件仍不显示的根本原因）：
+  - clientModules.clientPath 返回反斜杠路径，路径推导函数用正斜杠查找导致永远匹配失败
+  - normPath() 统一转换；已停用插件从 profile node_modules 直接读 package.json
+  - 启用已停用插件时推导 fallback 路径用于持久化
 - [ ] v5 更新插件本体：下载新版本并替换（需 npm 安装能力）
