@@ -144,22 +144,21 @@ return {
         const loader = ctx.get('loader');
         if (!loader) return out;
         out.loaderAvailable = true;
-        const entries = loader.entries();
-        out.entryCount = entries ? entries.length : 0;
-        if (entries) {
-          out.sampleNames = entries.slice(0, 12).map(function (e) { return e && e.options && e.options.name; })
-            .filter(function (n) { return typeof n === 'string' && n.length > 0; });
-          for (const entry of entries) {
-            if (entry && entry.options && entry.options.name === pluginId && !entry.options.group) {
-              out.matchedEntry = {
-                id: typeof entry.id === 'string' ? entry.id : String(entry.id),
-                name: String(entry.options.name),
-                disabled: !!entry.disabled,
-                hasFiber: !!entry.fiber,
-                group: !!entry.options.group
-              };
-              break;
-            }
+        // loader.entries() 是生成器，必须先展开为数组
+        const entries = Array.from(loader.entries() || []);
+        out.entryCount = entries.length;
+        out.sampleNames = entries.slice(0, 12).map(function (e) { return e && e.options && e.options.name; })
+          .filter(function (n) { return typeof n === 'string' && n.length > 0; });
+        for (const entry of entries) {
+          if (entry && entry.options && entry.options.name === pluginId && !entry.options.group) {
+            out.matchedEntry = {
+              id: typeof entry.id === 'string' ? entry.id : String(entry.id),
+              name: String(entry.options.name),
+              disabled: !!entry.disabled,
+              hasFiber: !!entry.fiber,
+              group: !!entry.options.group
+            };
+            break;
           }
         }
       } catch (e) {
