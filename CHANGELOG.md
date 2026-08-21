@@ -7,7 +7,7 @@
 
 ### Added
 
-- 初始第三方插件管理能力（静态 bundle 形态 `dsh-plugin-manager` / 层 id `tppm`）：
+- 初始第三方插件管理能力（静态 bundle 形态 `dsh-plugin-manager-lite` / 层 id `tppm`）：
   - 设置页「插件 → 第三方插件」选项卡 UI
   - 列表第三方插件（排除 `@deepseek-ai/*` 官方包）
   - 启用 / 停用（持久化到 `~/.dsh/cordis.patch.yml`，重启后保持）

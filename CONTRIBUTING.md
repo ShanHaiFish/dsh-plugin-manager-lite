@@ -1,6 +1,6 @@
 # 贡献指南 (Contributing)
 
-感谢你愿意为 **dsh-plugin-manager** 贡献！请花几分钟阅读以下约定。
+感谢你愿意为 **dsh-plugin-manager-lite** 贡献！请花几分钟阅读以下约定。
 
 ## 工作流
 

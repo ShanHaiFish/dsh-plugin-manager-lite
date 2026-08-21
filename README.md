@@ -1,4 +1,4 @@
-# dsh-plugin-manager
+# dsh-plugin-manager-lite
 
 管理 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) Web 中除官方插件外的第三方插件的**静态 bundle 插件**。
 
@@ -6,8 +6,8 @@
 `~/.dsh/cordis.patch.yml`，重启 DSH 后仍保持。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![npm](https://img.shields.io/npm/v/dsh-plugin-manager)](https://www.npmjs.com/package/dsh-plugin-manager)
-[![GitHub release](https://img.shields.io/github/v/release/ShanHaiFish/dsh-plugin-manager)](https://github.com/ShanHaiFish/dsh-plugin-manager/releases)
+[![npm](https://img.shields.io/npm/v/dsh-plugin-manager-lite)](https://www.npmjs.com/package/dsh-plugin-manager-lite)
+[![GitHub release](https://img.shields.io/github/v/release/ShanHaiFish/dsh-plugin-manager-lite)](https://github.com/ShanHaiFish/dsh-plugin-manager-lite/releases)
 
 > 当前为 **0.1.0 开发阶段**，尚未正式发布。仓库已建立但未发布 npm / GitHub Release。
 
@@ -32,13 +32,13 @@
 
 ```bash
 # 从 npm（发布后）
-dsh plugin --profile web add dsh-plugin-manager
+dsh plugin --profile web add dsh-plugin-manager-lite
 
 # 从 GitHub
-dsh plugin --profile web add github:ShanHaiFish/dsh-plugin-manager
+dsh plugin --profile web add github:ShanHaiFish/dsh-plugin-manager-lite
 
 # 本地目录（开发期）
-dsh plugin --profile web add /path/to/dsh-plugin-manager
+dsh plugin --profile web add /path/to/dsh-plugin-manager-lite
 ```
 
 或在 `~/.dsh/profiles/web/package.json` 手动加入依赖与 `dsh.profile.bundles`，然后重启 DSH。
@@ -60,7 +60,7 @@ dsh plugin --profile web add /path/to/dsh-plugin-manager
 ## 目录结构
 
 ```
-dsh-plugin-manager/
+dsh-plugin-manager-lite/
 ├── package.json          # 包名 = 金三角事实源（name / patch name / client load id）
 ├── cordis.patch.yml      # 把本包插入 profile 层栈（层 id: tppm）
 ├── lib/
@@ -97,15 +97,15 @@ Client 半区通过同源 `fetch` 调用 Host 半区（`/tppm/*`），区别于�
 npm run check
 ```
 
-**开发期同步到 profile**：Host 实际加载 `~/.dsh/profiles/web/node_modules/dsh-plugin-manager/`。
+**开发期同步到 profile**：Host 实际加载 `~/.dsh/profiles/web/node_modules/dsh-plugin-manager-lite/`。
 每次改动本仓库后，同步相关文件到该副本再重启：
 
 ```powershell
-$dst = "$HOME\.dsh\profiles\web\node_modules\dsh-plugin-manager"
+$dst = "$HOME\.dsh\profiles\web\node_modules\dsh-plugin-manager-lite"
 Copy-Item package.json, cordis.patch.yml, lib\index.js, client\client.js -Destination $dst -Force
 ```
 
-或直接重新 `dsh plugin --profile web add /path/to/dsh-plugin-manager`。
+或直接重新 `dsh plugin --profile web add /path/to/dsh-plugin-manager-lite`。
 
 ## 贡献
 

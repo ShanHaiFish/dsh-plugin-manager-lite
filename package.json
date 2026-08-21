@@ -1,7 +1,7 @@
 {
-  "name": "dsh-plugin-manager",
+  "name": "dsh-plugin-manager-lite",
   "version": "0.1.0",
-  "description": "DSH 静态 bundle 插件：在设置页管理第三方插件——列表、启用/停用（持久化到 ~/.dsh/cordis.patch.yml）、卸载、检查更新。A static-bundle DSH plugin that manages third-party plugins on the settings page: list, enable/disable (persisted), uninstall, and check for npm updates.",
+  "description": "DSH 静态 bundle 插件：在设置页管理第三方插件——列表、启用/停用（持久化到 ~/.dsh/cordis.patch.yml）、卸载、检查更新、一键升级。A static-bundle DSH plugin that manages third-party plugins on the settings page: list, enable/disable (persisted), uninstall, check for updates, and one-click upgrade.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -17,12 +17,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ShanHaiFish/dsh-plugin-manager.git"
+    "url": "https://github.com/ShanHaiFish/dsh-plugin-manager-lite.git"
   },
   "bugs": {
-    "url": "https://github.com/ShanHaiFish/dsh-plugin-manager/issues"
+    "url": "https://github.com/ShanHaiFish/dsh-plugin-manager-lite/issues"
   },
-  "homepage": "https://github.com/ShanHaiFish/dsh-plugin-manager#readme",
+  "homepage": "https://github.com/ShanHaiFish/dsh-plugin-manager-lite#readme",
   "author": {
     "name": "ShanHaiFish",
     "email": "aozhengjd_whw@126.com",

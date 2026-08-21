@@ -1,5 +1,5 @@
 // ============================================================
-// 第三方插件管理器 (dsh-plugin-manager) — v1.0.0 (静态 bundle 插件 · Client 半区)
+// 第三方插件管理器 (dsh-plugin-manager-lite) — v0.1.0 (静态 bundle 插件 · Client 半区)
 // 经 window.__ModuleLoader__.load 注册, 随 profile 层栈自动加载,
 // 无需每次重启 DSH 后重新 cordis_define/run。
 //
@@ -11,10 +11,10 @@
 //     与动态形态完全一致。
 // ============================================================
 window.__ModuleLoader__.load({
-  // 注册 id 必须等于 cordis.patch.yml 层的 name(即包名 dsh-plugin-manager),
+  // 注册 id 必须等于 cordis.patch.yml 层的 name(即包名 dsh-plugin-manager-lite),
   // 而非内部短 id tppm —— 否则 boot graph 找不到注册, 报
   // "bundle loaded without registering ..." (内部 name/路由前缀仍用 tppm)
-  id: 'dsh-plugin-manager',
+  id: 'dsh-plugin-manager-lite',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports

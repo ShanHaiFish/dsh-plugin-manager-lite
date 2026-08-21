@@ -26,4 +26,4 @@
 ## Security best practices
 
 - 只从可信来源安装本插件（npm 官方包 / 本仓库）。
-- 若对文件写入有顾虑，不要把 `dsh-plugin-manager` 加入不信任的 profile。
+- 若对文件写入有顾虑，不要把 `dsh-plugin-manager-lite` 加入不信任的 profile。
