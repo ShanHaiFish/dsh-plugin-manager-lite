@@ -17,6 +17,7 @@
 - **启用 / 停用**：切换插件运行状态；停用状态持久化到 `~/.dsh/cordis.patch.yml`，重启后保持
 - **卸载**：运行时停用 + 从 profile 配置移除（`dependencies` / `bundles`）
 - **检查更新**：查询 npm registry，对比当前版本与最新版本
+- **一键安装/升级**：对 npm 安装的第三方插件，更新 profile 依赖版本并在 profile 目录执行 `pnpm add <pkg>@^latest` 完成安装，装完后重启 DSH 生效；本地 `file:` 安装的插件不开放此按钮
 - **`/tppm/debug`**：排错端点，报告列表数据源各环节实际值
 
 ## 要求
@@ -85,6 +86,7 @@ Client 半区通过同源 `fetch` 调用 Host 半区（`/tppm/*`），区别于�
 | `POST /tppm/disablePlugin` | 停用插件（热停用 + 持久化） |
 | `POST /tppm/uninstallPlugin` | 卸载插件 |
 | `POST /tppm/checkForUpdates` | 检查更新 |
+| `POST /tppm/installUpdate` | 一键安装/升级到 npm 最新版本 |
 | `POST /tppm/diagnose` | loader entry 诊断 |
 | `POST /tppm/debug` | 列表数据源诊断 |
 

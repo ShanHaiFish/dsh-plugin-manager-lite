@@ -30,7 +30,7 @@
 
 ## 验证
 部署成功后：
-- Host 端应注册 7 个 handler：listThirdPartyPlugins, listAllPlugins, enablePlugin, disablePlugin, uninstallPlugin, checkForUpdates, diagnose
+- Host 端应注册 8 个 handler：listThirdPartyPlugins, listAllPlugins, enablePlugin, disablePlugin, uninstallPlugin, checkForUpdates, installUpdate, diagnose
 - Client 端应在设置页「插件 → 第三方插件」显示 6 个第三方插件
 - 用 cordis_inspect_self 确认 state 为 running
 

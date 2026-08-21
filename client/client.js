@@ -75,6 +75,8 @@ window.__ModuleLoader__.load({
       .plugin-actions button.disable:hover { background: #fffbeb; }
       .plugin-actions button.update { border-color: #3b82f6; color: #3b82f6; }
       .plugin-actions button.update:hover { background: #eff6ff; }
+      .plugin-actions button.install { border-color: #8b5cf6; color: #8b5cf6; }
+      .plugin-actions button.install:hover { background: #f5f3ff; }
       .plugin-actions button.uninstall { border-color: #ef4444; color: #ef4444; }
       .plugin-actions button.uninstall:hover { background: #fef2f2; }
       .empty-state { text-align: center; padding: 32px; color: #9ca3af; }
@@ -181,6 +183,7 @@ window.__ModuleLoader__.load({
                               ? React.createElement('button', { className: 'disable', onClick: function () { runAction('disablePlugin', plugin.id) }, disabled: busy !== null }, '停用')
                               : React.createElement('button', { className: 'enable', onClick: function () { runAction('enablePlugin', plugin.id) }, disabled: busy !== null }, '启用'),
                             React.createElement('button', { className: 'update', onClick: function () { runAction('checkForUpdates', plugin.id) }, disabled: busy !== null }, '检查更新'),
+                            !plugin.installedLocally && React.createElement('button', { className: 'install', onClick: function () { runAction('installUpdate', plugin.id, '确定要将 ' + plugin.id + ' 升级到 npm 最新版本吗？安装完成后需重启 DSH 生效。') }, disabled: busy !== null }, '安装新版本'),
                             React.createElement('button', { className: 'uninstall', onClick: function () { runAction('uninstallPlugin', plugin.id, '确定要卸载插件 ' + plugin.id + ' 吗？将同时从 profile 配置中移除。') }, disabled: busy !== null }, '卸载')
                           )
                         )
