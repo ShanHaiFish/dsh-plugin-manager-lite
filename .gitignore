@@ -29,3 +29,5 @@ storages/
 # npm artifacts
 *.tgz
 .npm/
+
+pnpm-lock.yaml
