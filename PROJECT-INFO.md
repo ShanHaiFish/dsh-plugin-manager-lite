@@ -10,7 +10,7 @@
 | 包版本 | `0.1.0`（GitHub Release v0.1.0 已发布） |
 | 层短 id / 路由前缀 | `tppm` / `/tppm/*` |
 | 独立仓库 | `ShanHaiFish/dsh-plugin-manager-lite`（Public，活跃，**本项目唯一事实源**） |
-| 插件组主页 | 闪烁的 DSH 插件库（Shimmering DSH Plugin Library）· `ShanHaiFish/dsh-plugins`（纯索引，只放链接，不托管源码） |
+| 插件组主页 | 闪烁的 DSH 插件库（Shimmering-dsh-plugins）· `ShanHaiFish/Shimmering-dsh-plugins`（纯索引，只放链接，不托管源码） |
 | 许可证 / 作者 | MIT / ShanHaiFish |
 
 > 原名 `dsh-plugin-manager` 的 npm 名被 `ruihuahe/hrhgit` 的同名项目占用，故改为 `-lite`。
@@ -21,7 +21,7 @@
 
 - 本插件以**独立仓库** `ShanHaiFish/dsh-plugin-manager-lite` 为唯一事实源：
   独立更新、独立打 tag（`vX.Y.Z`）、独立发 Release。
-- 插件组主页 `ShanHaiFish/dsh-plugins` **只做链接归组**（README 索引 + GitHub 标签
+- 插件组主页 `ShanHaiFish/Shimmering-dsh-plugins`（闪烁的 DSH 插件库）**只做链接归组**（README 索引 + GitHub 标签
   `dsh-plugin`），不托管任何插件源码；5 个 DSH 插件均为此模式。
 - 安装命令：
   ```bash
