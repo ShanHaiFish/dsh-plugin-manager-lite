@@ -9,7 +9,14 @@
 [![npm](https://img.shields.io/npm/v/dsh-plugin-manager-lite)](https://www.npmjs.com/package/dsh-plugin-manager-lite)
 [![GitHub release](https://img.shields.io/github/v/release/ShanHaiFish/dsh-plugin-manager-lite)](https://github.com/ShanHaiFish/dsh-plugin-manager-lite/releases)
 
-> 当前为 **0.1.0 开发阶段**，尚未正式发布。仓库已建立但未发布 npm / GitHub Release。
+> **⚠️ 本仓库已迁移归档**：dsh-plugin-manager-lite 的后续开发与发布已并入插件组仓库
+> **[ShanHaiFish/dsh-plugins](https://github.com/ShanHaiFish/dsh-plugins)**（源码位于
+> [`plugins/dsh-plugin-manager-lite/`](https://github.com/ShanHaiFish/dsh-plugins/tree/main/plugins/dsh-plugin-manager-lite)）。
+> v0.1.0 Release 与历史提交保留在本仓库。新安装命令：
+>
+> ```bash
+> dsh plugin --profile web add "github:ShanHaiFish/dsh-plugins#path:plugins/dsh-plugin-manager-lite"
+> ```
 
 ## 功能
 
@@ -34,8 +41,8 @@
 # 从 npm（发布后）
 dsh plugin --profile web add dsh-plugin-manager-lite
 
-# 从 GitHub
-dsh plugin --profile web add github:ShanHaiFish/dsh-plugin-manager-lite
+# 从 GitHub（已迁移至 dsh-plugins monorepo）
+dsh plugin --profile web add "github:ShanHaiFish/dsh-plugins#path:plugins/dsh-plugin-manager-lite"
 
 # 本地目录（开发期）
 dsh plugin --profile web add /path/to/dsh-plugin-manager-lite
