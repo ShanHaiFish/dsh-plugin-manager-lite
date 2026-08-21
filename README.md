@@ -9,24 +9,38 @@
 - **检查更新**：查询 npm registry，对比当前版本与最新版本
 - **卸载**：移除插件（规划中）
 
-## 安装位置
+## 安装位置（两种形态）
 
-插件以动态 Cordis 插件形式运行在 DSH 进程中（pluginId: `tpm-3`）。
-源码托管于本仓库，通过 cordis_define 部署到运行时。
+**形态 A — 静态 bundle（推荐，重启自动加载）**
+本插件已打包为静态 bundle，随 DSH profile 层栈自动加载，无需每次重启后重新
+cordis_define/run。
+
+- 包名：`dsh-plugin-manager`，层 id：`tppm`，Host 路由前缀：`/tppm/*`
+- 安装目录：`~/.dsh/plugins-dev/dsh-plugin-manager`（junction 指向本仓库）
+- 依赖注册：`~/.dsh/profiles/web/package.json` 的 `dependencies`（`file:`）与 `dsh.profile.bundles`
+- 修改 `lib/index.js` / `client/client.js` 后需 **重启 DSH** 生效（Host 层启动时组合 bundle）
+
+**形态 B — 动态 Cordis 插件（仅当前进程）**
+历史形态：通过 cordis_define 部署到运行时，重启后定义丢失需重新部署（pluginId 由 Host 分配）。
 
 ## 目录结构
 
 ```
+lib/
+  index.js    Host 半区（ESM：name/inject/apply + webServer 同源 JSON 路由 /tppm/*）
+client/
+  client.js   Client 半区（window.__ModuleLoader__.load 注册 + fetch 调用 Host 路由）
+cordis.patch.yml  bundle 层插入（id: tppm）
+package.json      包元数据（dsh.bundle.patch / dsh.client.platform）
 src/
-  host.js     Host 半源码（服务 + RPC 方法）
-  client.js   Client 半源码（设置页「插件 → 第三方插件」选项卡 UI）
+  host.js     动态形态 Host 半源码（参考）
+  client.js   动态形态 Client 半源码（参考）
 ```
 
 ## 开发流程
 
-1. 修改 `src/host.js` / `src/client.js`
-2. 通过 cordis_define 定义新 Package（kind: existing, pluginId: tpm-3）
-3. cordis_run update 激活
+- 静态 bundle：修改 `lib/index.js` / `client/client.js` → 重启 DSH 生效
+- 动态形态：修改 `src/host.js` / `src/client.js` → cordis_define（kind: new/existing）→ cordis_run
 
 ## 里程碑
 

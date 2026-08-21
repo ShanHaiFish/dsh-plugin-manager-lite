@@ -1,0 +1,21 @@
+{
+  "name": "dsh-plugin-manager",
+  "description": "DSH 静态 bundle 插件：第三方插件管理（列表/启用/停用/卸载/检查更新）。A static-bundle DSH plugin that manages third-party plugins on the settings page: list, enable/disable (with persistence to ~/.dsh/cordis.patch.yml), uninstall, and check for npm updates.",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": { "default": "./lib/index.js" },
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "client", "cordis.patch.yml", "README.md", "src"],
+  "license": "MIT",
+  "keywords": ["deepseek", "harness", "dsh", "dsh-plugin", "plugin-manager", "third-party", "web-ui"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web" }
+  },
+  "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1" }
+}
