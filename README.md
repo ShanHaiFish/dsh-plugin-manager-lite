@@ -9,7 +9,7 @@
 [![npm](https://img.shields.io/npm/v/dsh-plugin-manager-lite)](https://www.npmjs.com/package/dsh-plugin-manager-lite)
 [![GitHub release](https://img.shields.io/github/v/release/ShanHaiFish/dsh-plugin-manager-lite)](https://github.com/ShanHaiFish/dsh-plugin-manager-lite/releases)
 
-> 当前版本 **v0.1.0**（见 [GitHub Release](https://github.com/ShanHaiFish/dsh-plugin-manager-lite/releases)）；尚未发布 npm。
+> 当前版本 **v0.1.0**（见 [npm](https://www.npmjs.com/package/dsh-plugin-manager-lite) 与 [GitHub Release](https://github.com/ShanHaiFish/dsh-plugin-manager-lite/releases)）；已发布至 npm。
 
 ## 功能
 
@@ -31,7 +31,7 @@
 推荐用 `dsh plugin` 命令（等价于在 profile 下执行 `pnpm add`）：
 
 ```bash
-# 从 npm（发布后）
+# 从 npm
 dsh plugin --profile web add dsh-plugin-manager-lite
 
 # 从 GitHub
