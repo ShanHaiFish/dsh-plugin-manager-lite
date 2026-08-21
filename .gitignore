@@ -25,3 +25,7 @@ Thumbs.db
 .dsh/
 sessions/
 storages/
+
+# npm artifacts
+*.tgz
+.npm/

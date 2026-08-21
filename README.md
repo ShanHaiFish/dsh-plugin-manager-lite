@@ -1,63 +1,115 @@
-# DSH 第三方插件管理器 (third-party-plugin-manager)
+# dsh-plugin-manager
 
-管理 DeepSeek Harness Web 中除了官方插件（`@deepseek-ai/*`）之外的第三方插件。
+管理 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) Web 中除官方插件外的第三方插件的**静态 bundle 插件**。
+
+在设置页「插件 → 第三方插件」提供：**列表 / 启用 / 停用 / 卸载 / 检查更新**。停用状态持久化到
+`~/.dsh/cordis.patch.yml`，重启 DSH 后仍保持。
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/dsh-plugin-manager)](https://www.npmjs.com/package/dsh-plugin-manager)
+[![GitHub release](https://img.shields.io/github/v/release/ShanHaiFish/dsh-plugin-manager)](https://github.com/ShanHaiFish/dsh-plugin-manager/releases)
+
+> 当前为 **0.1.0 开发阶段**，尚未正式发布。仓库已建立但未发布 npm / GitHub Release。
 
 ## 功能
 
-- **列出第三方插件**：只显示非官方插件（当前环境 6 个），读取 package.json 展示真实名称、版本、作者、描述，并标注「本地安装 / npm」
-- **启用 / 停用**：切换插件运行状态
+- **列表第三方插件**：只显示非官方（非 `@deepseek-ai/*`）插件，读取 `package.json` 展示真实名称、版本、作者、描述，标注「本地安装 / npm」
+- **启用 / 停用**：切换插件运行状态；停用状态持久化到 `~/.dsh/cordis.patch.yml`，重启后保持
+- **卸载**：运行时停用 + 从 profile 配置移除（`dependencies` / `bundles`）
 - **检查更新**：查询 npm registry，对比当前版本与最新版本
-- **卸载**：移除插件（规划中）
+- **`/tppm/debug`**：排错端点，报告列表数据源各环节实际值
 
-## 安装位置（两种形态）
+## 要求
 
-**形态 A — 静态 bundle（推荐，重启自动加载）**
-本插件已打包为静态 bundle，随 DSH profile 层栈自动加载，无需每次重启后重新
-cordis_define/run。
+- DeepSeek Harness（`dsh`）`0.1.0-rc.7`+（developer preview，字段可能变化）
+- Node.js `>=18`
+- Peer dependency：`@deepseek-ai/cordis` `^4.0.1`
 
-- 包名：`dsh-plugin-manager`，层 id：`tppm`，Host 路由前缀：`/tppm/*`
-- 安装目录：`~/.dsh/plugins-dev/dsh-plugin-manager`（junction 指向本仓库）
-- 依赖注册：`~/.dsh/profiles/web/package.json` 的 `dependencies`（`file:`）与 `dsh.profile.bundles`
-- 修改 `lib/index.js` / `client/client.js` 后需 **重启 DSH** 生效（Host 层启动时组合 bundle）
+## 安装
 
-**形态 B — 动态 Cordis 插件（仅当前进程）**
-历史形态：通过 cordis_define 部署到运行时，重启后定义丢失需重新部署（pluginId 由 Host 分配）。
+推荐用 `dsh plugin` 命令（等价于在 profile 下执行 `pnpm add`）：
+
+```bash
+# 从 npm（发布后）
+dsh plugin --profile web add dsh-plugin-manager
+
+# 从 GitHub
+dsh plugin --profile web add github:ShanHaiFish/dsh-plugin-manager
+
+# 本地目录（开发期）
+dsh plugin --profile web add /path/to/dsh-plugin-manager
+```
+
+或在 `~/.dsh/profiles/web/package.json` 手动加入依赖与 `dsh.profile.bundles`，然后重启 DSH。
+
+> **注意**：Host 从 `~/.dsh/profiles/web/node_modules/<包名>/` 解析并服务本插件。
+> 开发期修改本仓库源码后，必须把改动**同步到该副本**再重启 DSH 才生效
+> （`dsh plugin add` 会执行同步；手动拷贝请见「开发」）。
+
+## 使用
+
+重启 DSH 后，打开浏览器进入 Web GUI → **设置 → 插件 → 第三方插件**：
+
+- 点「刷新」重新拉取插件列表；
+- 运行中的插件可「停用」；已停用的插件可「启用」；
+- 每个插件可「检查更新」「卸载」。
+
+停用 / 启用结果通过 `alert` 提示，操作成功会刷新列表反映真实状态。
 
 ## 目录结构
 
 ```
-lib/
-  index.js    Host 半区（ESM：name/inject/apply + webServer 同源 JSON 路由 /tppm/*）
-client/
-  client.js   Client 半区（window.__ModuleLoader__.load 注册 + fetch 调用 Host 路由）
-cordis.patch.yml  bundle 层插入（id: tppm）
-package.json      包元数据（dsh.bundle.patch / dsh.client.platform）
-src/
-  host.js     动态形态 Host 半源码（参考）
-  client.js   动态形态 Client 半源码（参考）
+dsh-plugin-manager/
+├── package.json          # 包名 = 金三角事实源（name / patch name / client load id）
+├── cordis.patch.yml      # 把本包插入 profile 层栈（层 id: tppm）
+├── lib/
+│   └── index.js          # Host 半区（ESM）：webServer 同源 JSON 路由 /tppm/*
+├── client/
+│   └── client.js         # Client 半区（浏览器 bundle）：设置页选项卡 UI
+├── src/                  # 动态形态源码（参考，不参与安装加载）
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CODE_OF_CONDUCT.md
+└── LICENSE               # MIT
 ```
 
-## 开发流程
+## Host 路由
 
-- 静态 bundle：修改 `lib/index.js` / `client/client.js` → 重启 DSH 生效
-- 动态形态：修改 `src/host.js` / `src/client.js` → cordis_define（kind: new/existing）→ cordis_run
+Client 半区通过同源 `fetch` 调用 Host 半区（`/tppm/*`），区别于动态形态的 `host.call`：
 
-## 里程碑
+| 方法 | 说明 |
+|---|---|
+| `POST /tppm/listThirdPartyPlugins` | 列出第三方插件（含已停用） |
+| `POST /tppm/listAllPlugins` | 列举所有插件（含官方，调试用） |
+| `POST /tppm/enablePlugin` | 启用插件（热启用 + 持久化） |
+| `POST /tppm/disablePlugin` | 停用插件（热停用 + 持久化） |
+| `POST /tppm/uninstallPlugin` | 卸载插件 |
+| `POST /tppm/checkForUpdates` | 检查更新 |
+| `POST /tppm/diagnose` | loader entry 诊断 |
+| `POST /tppm/debug` | 列表数据源诊断 |
 
-- [x] v1 基础框架：服务 + 设置页选项卡
-- [x] v2 修复列表：正确遍历 graph.entries（数组），只显示第三方插件
-- [x] v2 显示真实名称：读取 package.json 元信息
-- [x] v3 修复检查更新：WebFetchResult.body 为 { kind, content } 结构
-- [x] v4 真正的启用/停用/卸载：
-  - loader entry.update({ disabled }) 运行时热切换（立即生效）
-  - 持久化到 `~/.dsh/cordis.patch.yml`（重启后保持）
-  - 卸载时从 profile package.json 移除 dependencies + bundles
-  - 列表显示真实运行状态（fiber 存活判断）
-- [x] v4.1 修复停用后插件从列表消失：
-  - 列表数据源合并 graph（运行中）+ profile.bundles（配置中已停用）
-  - 停用的插件仍显示并可重新启用
-- [x] v4.2 修复 Windows 路径 bug（停用后插件仍不显示的根本原因）：
-  - clientModules.clientPath 返回反斜杠路径，路径推导函数用正斜杠查找导致永远匹配失败
-  - normPath() 统一转换；已停用插件从 profile node_modules 直接读 package.json
-  - 启用已停用插件时推导 fallback 路径用于持久化
-- [ ] v5 更新插件本体：下载新版本并替换（需 npm 安装能力）
+## 开发
+
+```bash
+# 语法检查
+npm run check
+```
+
+**开发期同步到 profile**：Host 实际加载 `~/.dsh/profiles/web/node_modules/dsh-plugin-manager/`。
+每次改动本仓库后，同步相关文件到该副本再重启：
+
+```powershell
+$dst = "$HOME\.dsh\profiles\web\node_modules\dsh-plugin-manager"
+Copy-Item package.json, cordis.patch.yml, lib\index.js, client\client.js -Destination $dst -Force
+```
+
+或直接重新 `dsh plugin --profile web add /path/to/dsh-plugin-manager`。
+
+## 贡献
+
+欢迎提交 Issue 与 Pull Request。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+安全相关请按 [SECURITY.md](SECURITY.md) 处理。
+
+## 许可证
+
+[MIT](LICENSE) © [ShanHaiFish](https://github.com/ShanHaiFish)。
