@@ -11,7 +11,10 @@
 //     与动态形态完全一致。
 // ============================================================
 window.__ModuleLoader__.load({
-  id: 'tppm',
+  // 注册 id 必须等于 cordis.patch.yml 层的 name(即包名 dsh-plugin-manager),
+  // 而非内部短 id tppm —— 否则 boot graph 找不到注册, 报
+  // "bundle loaded without registering ..." (内部 name/路由前缀仍用 tppm)
+  id: 'dsh-plugin-manager',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
